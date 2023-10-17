@@ -1,0 +1,16 @@
+{
+  "name": "kraken-garage",
+  "version": "1.0.0",
+  "description": "",
+  "main": "start-kraken.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "VF",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "dorita980": "^3.1.11",
+    "dotenv": "^16.3.1",
+    "mqtt": "^4.3.7"
+  }
+}

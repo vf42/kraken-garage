@@ -1,0 +1,140 @@
+#!/usr/bin/python3 -u
+
+"""
+Perform the following in the loop:
+1. Idle for 1 minute
+2. Take the picture with camera
+  2.1. If picture is dark - goto 1
+  2.2. Otherwise, Idle for 10 minutes
+3. Take another picture with camera
+  3.1. If picture is dark - goto 1
+  3.2. Otherwise, Launch Kraken with start-robot script
+4. Idle for 1 hour
+5. Take a picture with the camera
+  5.1. If picture is dark - goto 1 (next waiting period)
+  5.2. Otherwise, go to 6 (the door is still open)
+"""
+
+from enum import Enum
+import time
+import datetime
+import subprocess
+from pathlib import Path
+import sys
+import traceback
+
+from gpiozero.exc import BadPinFactory
+from gpiozero import LED, LightSensor, Buzzer
+
+
+class LoopState(Enum):
+    DOOR_CLOSED = 1  # Transition 1-2
+    DOOR_OPEN = 2  # Transition 3-4
+    RESET = 3  # Transition 6-7
+
+
+DELAY_FACTOR = 60 # All delays are in minutes, except for START_BEEP_TIME
+IDLE_DELAY = DELAY_FACTOR * 1
+START_BEEP_TIME = 5
+START_DELAY = DELAY_FACTOR * 10 - START_BEEP_TIME
+RESET_DELAY = DELAY_FACTOR * 60
+
+light_sensor = None
+red_led = None
+buzzer = None
+debug_mode = False
+
+def log(msg):
+    print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: {msg}")
+
+try:
+    light_sensor = LightSensor(23)
+    red_led = LED(14)
+    buzzer = Buzzer(24)
+    # Startup indication.
+    red_led.blink(0.2, 0.2, 5)
+except BadPinFactory:
+    # We are likely not running on a Raspberry Pi, enter debug mode.
+    log("Debug mode, create a file named light_on to simulate light being on")
+    debug_mode = True
+
+
+def is_dark():
+    if debug_mode:
+        return not Path("./light_on").is_file()
+    return not light_sensor.light_detected
+
+
+def set_err_status():
+    if debug_mode:
+        return
+    red_led.on()
+
+
+def door_open_notification():
+    if debug_mode:
+        return
+    buzzer.beep()
+    time.sleep(START_BEEP_TIME)
+    buzzer.off()
+
+launch_in_progress = False
+
+def toggle_launch_in_progress():
+    if debug_mode:
+        return
+    global launch_in_progress
+    if launch_in_progress:
+        red_led.off()
+    else:
+        red_led.blink()
+    launch_in_progress = not launch_in_progress
+
+def start_kraken():
+    toggle_launch_in_progress()
+    subprocess.run("./start-kraken", check=True)
+    toggle_launch_in_progress()
+
+state = LoopState.DOOR_CLOSED if is_dark() else LoopState.RESET
+log(f"Initial state: {'RESET' if state == LoopState.RESET else 'DOOR_CLOSED'}")
+
+try:
+    while True:
+        if state == LoopState.DOOR_CLOSED:
+            log("Checking the door state")
+            if is_dark():
+                log("It's closed, sleeping...")
+                time.sleep(IDLE_DELAY)
+            else:
+                log("It's open, waiting for 10 minutes")
+                state = LoopState.DOOR_OPEN
+                door_open_notification()
+                time.sleep(START_DELAY)
+        elif state == LoopState.DOOR_OPEN:
+            log("Checking whether the door is still open")
+            if is_dark():
+                log("It's closed now, not doing anything")
+                state = LoopState.DOOR_CLOSED
+                time.sleep(IDLE_DELAY)
+            else:
+                log("It still is, telling Kraken to go!")
+                start_kraken()
+                log("Kraken should be out now, will wait for it to return")
+                state = LoopState.RESET
+                time.sleep(RESET_DELAY)
+        elif state == LoopState.RESET:
+            log("Checking whether the door is closed again")
+            if is_dark():
+                log("It's closed now, resetting the loop")
+                state = LoopState.DOOR_CLOSED
+                time.sleep(IDLE_DELAY)
+            else:
+                log("It's still open, not doing anything")
+                time.sleep(RESET_DELAY)
+except Exception as exc:
+    log(f"Error: {exc}\n{''.join(traceback.format_tb(exc.__traceback__))}")
+    set_err_status()
+
+while True:
+    # Will only end up here in case of exception, idling to keep the LED on.
+    pass

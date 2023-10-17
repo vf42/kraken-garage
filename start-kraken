@@ -1,0 +1,36 @@
+#!/usr/bin/node
+
+const dorita980 = require("dorita980");
+const process = require("process")
+const dotenv = require("dotenv");
+
+dotenv.config();
+
+const IR_BLID = process.env.IR_BLID;
+const IR_PASS = process.env.IR_PASS;
+let IR_IP = process.env.IR_IP;
+
+function launchRobot(ip) {
+    const myRobotViaLocal = new dorita980.Local(IR_BLID, IR_PASS, ip);
+    myRobotViaLocal.on("connect", () => {
+        console.log("Connected to Kraken");
+        myRobotViaLocal.clean()
+            .then(() => {
+                myRobotViaLocal.end();
+                console.log("Returning to daemon");
+                process.exit(0);
+            }) // disconnect to leave free the channel for the mobile app.
+            .catch(console.log);
+    });
+}
+
+if (IR_IP) {
+    console.log("Kraken's IP is provided, will connect directly")
+    launchRobot(IR_IP);
+} else {
+    console.log("No IP provided, will attempt auto-discovery")
+    dorita980.discovery((ierr, data) => {
+        console.log(`Found Kraken at ${data.ip}`);
+        launchRobot(data.ip);
+    });
+}
