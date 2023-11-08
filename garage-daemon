@@ -33,11 +33,13 @@ class LoopState(Enum):
     RESET = 3  # Transition 6-7
 
 
-DELAY_FACTOR = 60 # All delays are in minutes, except for START_BEEP_TIME
+DELAY_FACTOR = 1 # All delays are in minutes, except for START_BEEP_TIME
 IDLE_DELAY = DELAY_FACTOR * 1
 START_BEEP_TIME = 5
-START_DELAY = DELAY_FACTOR * 10 - START_BEEP_TIME
+START_DELAY = DELAY_FACTOR * 5 - START_BEEP_TIME
 RESET_DELAY = DELAY_FACTOR * 60
+
+START_KRAKEN_TIMEOUT = 120 # 2 min
 
 light_sensor = None
 red_led = None
@@ -67,6 +69,7 @@ def is_dark():
 
 def set_err_status():
     if debug_mode:
+        log("Entered error state")
         return
     red_led.on()
 
@@ -92,7 +95,7 @@ def toggle_launch_in_progress():
 
 def start_kraken():
     toggle_launch_in_progress()
-    subprocess.run("./start-kraken", check=True)
+    subprocess.run("./start-kraken", check=True, timeout=START_KRAKEN_TIMEOUT)
     toggle_launch_in_progress()
 
 state = LoopState.DOOR_CLOSED if is_dark() else LoopState.RESET
