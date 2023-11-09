@@ -24,7 +24,7 @@ import sys
 import traceback
 
 from gpiozero.exc import BadPinFactory
-from gpiozero import Device, LED, DistanceSensor, Buzzer
+from gpiozero import LED, DistanceSensor, Buzzer
 
 
 class LoopState(Enum):
@@ -33,7 +33,7 @@ class LoopState(Enum):
     RESET = 3  # Transition 6-7
 
 
-DELAY_FACTOR = 1  # All delays are in minutes, except for START_BEEP_TIME
+DELAY_FACTOR = 60  # All delays are in minutes, except for START_BEEP_TIME
 IDLE_DELAY = max(int(DELAY_FACTOR * 0.5), 1)
 START_BEEP_TIME = 5
 START_DELAY = DELAY_FACTOR * 5 - START_BEEP_TIME
