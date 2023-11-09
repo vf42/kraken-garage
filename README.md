@@ -21,9 +21,10 @@ Uses [Dorita980](https://github.com/koalazak/dorita980/) to interact with the iR
 * Raspberry Pi (Zero W) with nodejs installed (for Dorita980)    
 
 Expected periphery:
-* LED on pin 14
-* Light sensor on GPIO pin 23
-* Buzzer on GPIO pin 24
+* Distance sensor (HC-SR04) on GPIO pins 27 (trigger) and 14 (echo)
+    * See https://gpiozero.readthedocs.io/en/latest/api_input.html#distancesensor-hc-sr04 for the correct connection instructions.
+* LED on pin 9
+* Buzzer on pin 22
 
 ## Setting up
 

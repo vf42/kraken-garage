@@ -24,7 +24,7 @@ import sys
 import traceback
 
 from gpiozero.exc import BadPinFactory
-from gpiozero import LED, LightSensor, Buzzer
+from gpiozero import Device, LED, DistanceSensor, Buzzer
 
 
 class LoopState(Enum):
@@ -33,26 +33,30 @@ class LoopState(Enum):
     RESET = 3  # Transition 6-7
 
 
-DELAY_FACTOR = 1 # All delays are in minutes, except for START_BEEP_TIME
-IDLE_DELAY = DELAY_FACTOR * 1
+DELAY_FACTOR = 1  # All delays are in minutes, except for START_BEEP_TIME
+IDLE_DELAY = max(int(DELAY_FACTOR * 0.5), 1)
 START_BEEP_TIME = 5
 START_DELAY = DELAY_FACTOR * 5 - START_BEEP_TIME
 RESET_DELAY = DELAY_FACTOR * 60
 
-START_KRAKEN_TIMEOUT = 120 # 2 min
+START_KRAKEN_TIMEOUT = 4  # 2 min
 
-light_sensor = None
+DISTANCE_THRESHOLD = 0.3
+
+distance_sensor = None
 red_led = None
 buzzer = None
 debug_mode = False
 
+
 def log(msg):
     print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: {msg}")
 
+
 try:
-    light_sensor = LightSensor(23)
-    red_led = LED(14)
-    buzzer = Buzzer(24)
+    distance_sensor = DistanceSensor(trigger=27, echo=14)
+    red_led = LED(9)
+    buzzer = Buzzer(22)
     # Startup indication.
     red_led.blink(0.2, 0.2, 5)
 except BadPinFactory:
@@ -61,10 +65,10 @@ except BadPinFactory:
     debug_mode = True
 
 
-def is_dark():
+def is_door_closed():
     if debug_mode:
         return not Path("./light_on").is_file()
-    return not light_sensor.light_detected
+    return distance_sensor.distance < DISTANCE_THRESHOLD
 
 
 def set_err_status():
@@ -81,7 +85,9 @@ def door_open_notification():
     time.sleep(START_BEEP_TIME)
     buzzer.off()
 
+
 launch_in_progress = False
+
 
 def toggle_launch_in_progress():
     if debug_mode:
@@ -93,29 +99,30 @@ def toggle_launch_in_progress():
         red_led.blink()
     launch_in_progress = not launch_in_progress
 
+
 def start_kraken():
     toggle_launch_in_progress()
     subprocess.run("./start-kraken", check=True, timeout=START_KRAKEN_TIMEOUT)
     toggle_launch_in_progress()
 
-state = LoopState.DOOR_CLOSED if is_dark() else LoopState.RESET
+state = LoopState.DOOR_CLOSED if is_door_closed() else LoopState.RESET
 log(f"Initial state: {'RESET' if state == LoopState.RESET else 'DOOR_CLOSED'}")
 
 try:
     while True:
         if state == LoopState.DOOR_CLOSED:
             log("Checking the door state")
-            if is_dark():
+            if is_door_closed():
                 log("It's closed, sleeping...")
                 time.sleep(IDLE_DELAY)
             else:
-                log("It's open, waiting for 10 minutes")
+                log("It's open, waiting for people to leave")
                 state = LoopState.DOOR_OPEN
                 door_open_notification()
                 time.sleep(START_DELAY)
         elif state == LoopState.DOOR_OPEN:
             log("Checking whether the door is still open")
-            if is_dark():
+            if is_door_closed():
                 log("It's closed now, not doing anything")
                 state = LoopState.DOOR_CLOSED
                 time.sleep(IDLE_DELAY)
@@ -127,7 +134,7 @@ try:
                 time.sleep(RESET_DELAY)
         elif state == LoopState.RESET:
             log("Checking whether the door is closed again")
-            if is_dark():
+            if is_door_closed():
                 log("It's closed now, resetting the loop")
                 state = LoopState.DOOR_CLOSED
                 time.sleep(IDLE_DELAY)
