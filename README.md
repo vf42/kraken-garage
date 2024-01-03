@@ -1,16 +1,16 @@
 # Kraken Garage
 
-Start iRobot automatically when the closet door is open, as detected by the light sensor.
+Start iRobot automatically when the closet door is open, as detected by the distance sensor.
 
 Use case: you leave home on irregular schedule, so setting the fixed schedule for the iRobot doesn't work. Moreover, you iRobot is placed in a closet, so I open the door for it to break free when you leave, but then you forget to launch the job manully. Here comes the Kraken Garage: it will allow you to monitor the door and start Kraken automatically once it's open.
 
-Here's my POC setup using Raspberry Pi Zero W and a breadboard:
-![Breadboard POC](docs/breadboard_poc.jpg)
+Here's my unit with periphery soldered on a grid board.
+![RPi Zero with grid board attached](docs/v2.jpg)
 
 Workflow:
-1. Checks for the light sensor value every minute
-2. If there is light, waits for another 10 minutes
-3. If there is still light, starts the iRobot
+1. Checks for the distance sensor value twice every minute
+2. If it's above the threshold (aka door is open), waits for another 5 minutes
+3. If it's still above the threshold, starts the iRobot
 
 Well, you can also replace the `start-kraken` script with whatever other thing you want to do on the similar condition.
 
@@ -41,5 +41,5 @@ The following env variables are expcted by the start-kraken script:
 
 ## Known issues
 
-* For some reason, Dorita's auto-discovery stopped working for me at some point, so I have to specify the iRobot IP address explicitly. Your experience may vary
+* For some reason, Dorita's auto-discovery stopped working for me at some point, so I have to specify the iRobot IP address explicitly. Your experience may vary.
 * Upstream version of Dorita980 doesn't work with the latest NodeJS, see https://github.com/koalazak/dorita980/pull/168. The version provided in the PR worked fine for me, just replace the contents of `node-modules/dorita980` with the patched version.
