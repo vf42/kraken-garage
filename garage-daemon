@@ -40,6 +40,7 @@ START_DELAY = DELAY_FACTOR * 5 - START_BEEP_TIME
 RESET_DELAY = DELAY_FACTOR * 60
 
 START_KRAKEN_TIMEOUT = 120  # 2 min
+START_KRAKEN_RETRIES = 3
 
 DISTANCE_THRESHOLD = 0.3
 
@@ -78,6 +79,13 @@ def set_err_status():
     red_led.on()
 
 
+def clear_err_status():
+    if debug_mode:
+        log("Clearing error state")
+        return
+    red_led.off()
+
+
 def door_open_notification():
     if debug_mode:
         return
@@ -102,14 +110,26 @@ def toggle_launch_in_progress():
 
 def start_kraken():
     toggle_launch_in_progress()
-    subprocess.run("./start-kraken", check=True, timeout=START_KRAKEN_TIMEOUT)
+    for i in range(START_KRAKEN_RETRIES):
+        # Sometimes Dorita call exits successfully but the robot doesn't start.
+        # So we retry a few times no matter what and return.
+        try:
+            subprocess.run(
+                "./start-kraken",
+                check=True,
+                timeout=START_KRAKEN_TIMEOUT)
+        except Exception as e:
+            log(f"Error on kraken start: {e}\n{''.join(traceback.format_tb(exc.__traceback__))}")
+            log()
+            if i < START_KRAKEN_RETRIES - 1:
+                 log(f"Will retry {START_KRAKEN_RETRIES - i - 1} times")
     toggle_launch_in_progress()
 
 state = LoopState.DOOR_CLOSED if is_door_closed() else LoopState.RESET
 log(f"Initial state: {'RESET' if state == LoopState.RESET else 'DOOR_CLOSED'}")
 
-try:
-    while True:
+while True:
+    try:
         if state == LoopState.DOOR_CLOSED:
             log("Checking the door state")
             if is_door_closed():
@@ -136,15 +156,17 @@ try:
             log("Checking whether the door is closed again")
             if is_door_closed():
                 log("It's closed now, resetting the loop")
+                clear_err_status()
                 state = LoopState.DOOR_CLOSED
                 time.sleep(IDLE_DELAY)
             else:
                 log("It's still open, not doing anything")
                 time.sleep(RESET_DELAY)
-except Exception as exc:
-    log(f"Error: {exc}\n{''.join(traceback.format_tb(exc.__traceback__))}")
-    set_err_status()
+    except Exception as exc:
+        log(f"Error: {exc}\n{''.join(traceback.format_tb(exc.__traceback__))}")
+        set_err_status()
+        state = LoopState.RESET
 
 while True:
     # Will only end up here in case of exception, idling to keep the LED on.
-    pass
+    time.sleep(3600)
